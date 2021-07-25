@@ -4,6 +4,6 @@ GPU的核心技术。那要从GPU RTL搞起，梳理出一套知识，给出硬�
 
 ## Render
 
-- [2021/07/25][Using asynchronous compute on Arm Mali GPUs: A practical sample](./render/UsingAsynchronousComputeOnArmMaliGPUs:APracticalSample.md)
+- 2021-07-25 [Using asynchronous compute on Arm Mali GPUs: A practical sample](./render/UsingAsynchronousComputeOnArmMaliGPUs:APracticalSample.md)
 
 ## Compute
