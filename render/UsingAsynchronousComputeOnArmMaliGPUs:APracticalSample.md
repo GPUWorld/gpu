@@ -38,9 +38,9 @@ for draw in renderPass:
 
 这里的**绘制调用**（draw call）为 GL 的描绘次数，也可称为一条用来渲染网格的命令，这条命令由 CPU 发出，并被 GPU 接收。GL 绘图一般次序为：设置颜色——绘图方式——顶点坐标——绘制——结束。每帧会重复该过程，该过程就是一次`draw call`。即上述伪代码中的 `renderPass`的一次`draw`。
 
-> 网格（Mesh）代表一个可绘制实体，一般来说，Mesh 指 3D 模型的网格，由多边形拼接而成的，复杂多边形由多个三角面拼接而成的。所以一个 3D 模型的表面是由多个彼此相连的三角面构成的，三维空间中，构成这些三角面的点以及三角形的边的集合就是 Mesh，在OpenGL中我们可以定义网格（Mesh）类结构体，其成员可以是多个顶点（Vertex）结构体的组合，而顶点（Vertex）是包含了位置、纹理坐标等信息的结构体。
+> 网格（Mesh）代表一个可绘制实体，一般来说，Mesh 指 3D 模型的网格，由多边形拼接而成的，复杂多边形由多个三角面拼接而成的。所以一个 3D 模型的表面是由多个彼此相连的三角面构成的，三维空间中，构成这些三角面的点以及三角形的边的集合就是 Mesh，在 OpenGL 中我们可以定义网格（Mesh）类结构体，其成员可以是多个顶点（Vertex）结构体的组合，而顶点（Vertex）是包含了位置、纹理坐标等信息的结构体。
 
-`draw call`命令发出后，GPU 使用 Render State（材质、纹理、着色器）和所有顶点数据（这些数据就是下图中的`Atrtibutes`和`Textures`），通过代码魔法将这些信息转换为屏幕上的彩色像素，这个转换过程也被称为 **Pipeline**（流水线，或者别扭的直译叫法“管线”） 。该过程简化用下图表示，中间如栅格化（rasterization，表示将计算机图形学中的[向量图形](https://zh.wikipedia.org/wiki/向量圖形)转换成像素阵列，即[位图](https://zh.wikipedia.org/wiki/位图)的过程）等操作略过：
+`draw call`命令发出后，GPU 使用 Render State（材质、纹理、着色器）和所有顶点数据（这些数据就是下图中的`Atrtibutes`和`Textures`），通过代码魔法将这些信息转换为屏幕上的彩色像素，这个转换过程也被称为 **Pipeline**（流水线，或者别扭的直译叫法“管线”，我不喜欢叫“管线”:p） 。该过程简化用下图表示，中间如栅格化等操作略过（栅格化—— rasterization，表示将计算机图形学中的[向量图形](https://zh.wikipedia.org/wiki/向量圖形)转换成像素阵列，即[位图](https://zh.wikipedia.org/wiki/位图)的过程）：
 
 ![img](https://developer.arm.com/-/media/developer/Graphics%20and%20Multimedia/Developer%20Guide%20Article%20Inline%20Images/Tile-based%20rendering/imr.svg?revision=c0aeae87-6090-48b5-a797-31ced10e01f3&la=en&hash=23B87C30910C78519B6E9E4111BA8080C6C66571)
 
@@ -53,20 +53,20 @@ for draw in renderPass:
 
 这么看，传统桌面级 GPU 两个串行队列的立即模式下，非常低效。这里也[科普一下这种最早的**立即模式渲染**（Immediate Mode Rendering，IMR）](https://www.igao7.com/news/201406/1217-vv-gpu.html)。
 
-> 传统桌面 GPU（nVIDIA，AMD）都是IMR架构，在移动领域，nVIDIA 的 GeForce ULP 和 Vivante 的 GC 系列 GPU 都是属于 IMR 架构。IMR 架构的 GPU 渲染完物体后，都会把结果写到系统内存中的帧缓存里（FrameBuffer，见上图的Framebuffer Working Set），因此就可能出现 GPU 花了大量的时间渲染了一个被遮挡的看不见的物体，而最后这些结果在渲染完遮挡物后被覆盖，做了无用功。这个问题称之为 Overdraw。
+> 传统桌面 GPU（nVIDIA，AMD）都是 IMR 架构，在移动领域，nVIDIA 的 GeForce ULP 和 Vivante 的 GC 系列 GPU 都是属于 IMR 架构。IMR 架构的 GPU 渲染完物体后，都会把结果写到系统内存中的帧缓存里（FrameBuffer，见上图的Framebuffer Working Set），因此就可能出现 GPU 花了大量的时间渲染了一个被遮挡的看不见的物体，而最后这些结果在渲染完遮挡物后被覆盖，做了无用功。这个问题称之为 Overdraw。
 >
 > 虽然现代的 IMR 架构 GPU 在一定程度上可以避免这个问题，因为后续又有了 TBR （Tlie Based Rendering）架构，但要求应用程序将场景里的三角形按照严格的从前往后的顺序提交给 GPU，要完全避免 Overdraw 还是很困难的，当然后续的TBDR（Tile Based Deferred Rendering）架构完全避免了这个问题，是后话了。
 
 ## 移动端 Arm Mali GPU 的队列任务流程
 
-Arm Mali 是 **Tile Based GPU**，其特点是相比传统的桌面 GPU 立即模式，以大小为 16 x 16 的 tile 解决了在Fragment Shader 计算过程中，与 DDR 反复读取数据的带宽问题， 且能被进一步压缩减少DDR传输开销，**说白了就是更省带宽**。分块也因此带来了相应的分块队列布局，也就是 Tiler 数组，Arm Mali GPU 其简化的渲染流程如下图。
+Arm Mali 是 **Tile Based GPU**，其实这个架构不仅在 Mali 上有用到，TBG 是很多移动端 GPU 早起的通用架构，其特点是相比传统的桌面 GPU 立即模式，TBG 以大小为 16 x 16 的 tile 解决了在 Fragment Shader 计算过程中，与 DDR 反复读取数据的带宽问题， 且能被进一步压缩减少 DDR 传输开销，**说白了就是更省带宽**。分块也因此带来了相应的分块队列布局，也就是 Tiler 数组，Arm Mali GPU 其简化的渲染流程如下图。
 
 ![hardware flow](https://developer.arm.com/-/media/developer/Graphics%20and%20Multimedia/Developer%20Guide%20Article%20Inline%20Images/Tile-based%20rendering/tbr.svg?revision=0d2147a0-2d78-456d-949e-94c3731bd6ba&hash=CD76FA018D89460B8A5F1DACAE6C338F4F7E404C&la=en)
 
-上图中，渲染流程（pipeline）从硬件处理角度来说，被中间的虚线一分为二：
+上图中，渲染流程（pipeline）从硬件处理角度来说，被中间的虚线一分为二，我们简单说一下：
 
-1. Attributes(DDR) -> Vertex Shader -> Tiler -> Geometry Working Set(DDR)：其中 Vertex Shader 和 Tiler 的过程构成第一个硬件任务处理队列，这里与桌面GPU的不同是，中间结果 Geometry Working Set 会存储到 DDR 上，估计也是对 On-Chip memory 大小的考虑；
-2. Geometry Working Set(DDR) / Textures(DDR) -> Fragment Shader <-> Local Tile Memory(GPU) -> Compress Framebuffer(DDR)：Fragment Shader 则是第二个硬件队列的起始处理节点，与 Fragment Shader 交互的在桌面级 GPU 只有均位于 DDR 上的 Texture 和 FrameBuffer Working Set，前者是输入，后者是输出和临时结果暂存；而移动端 GPU 与 Fragment Shader 交互的有三个：位于 DDR 上的 Texture 和 Geometry Working Set 是输入，**而 Local Tiled Memory 是位于 On-Chip 的，这是与桌面级 GPU 的极大不同，是对性能和片上内存的综合考虑**，其经过压缩进而变为 DDR 上体积更小的 Compressed FrameBuffer。
+1. 第一条路径—— Attributes(DDR) -> Vertex Shader -> Tiler -> Geometry Working Set(DDR)：其中 Vertex Shader 和 Tiler 的过程构成第一个硬件任务处理队列，这里与桌面 GPU 的不同是，中间结果 Geometry Working Set 会存储到 DDR 上，估计也是对 On-Chip memory 大小的考虑；
+2. 第二条路径—— Geometry Working Set(DDR) / Textures(DDR) -> Fragment Shader <-> Local Tile Memory(GPU) -> Compress Framebuffer(DDR)：Fragment Shader 则是第二个硬件队列的起始处理节点，与 Fragment Shader 交互的在桌面级 GPU 只有均位于 DDR 上的 Texture 和 FrameBuffer Working Set，前者是输入，后者是输出和临时结果暂存；而移动端 GPU 与 Fragment Shader 交互的有三个：位于 DDR 上的 Texture 和 Geometry Working Set 是输入，**而 Local Tiled Memory 是位于 On-Chip 的，这是与桌面级 GPU 的极大不同，是对性能和片上内存的综合考虑**，其经过压缩进而变为 DDR 上体积更小的 Compressed FrameBuffer。
 
 计算任务会随着 Vertex Shader 和 Tiler 的处理而进行，其实也可以把 Vertex Shader 看成是 Compute Shader ，因为它做的都是计算。这两个硬件处理流程对应的伪代码如下：
 
